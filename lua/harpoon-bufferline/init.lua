@@ -6,8 +6,16 @@ local function GetAbsPath(path)
 end
 
 ---@param item HarpoonListItem
-local function GetBufferLineBufferFromHarpoonItem(bufferline, item)
+local function GetBufferLineBufferFromHarpoonItem(bufferline, item, bufnr)
     local absPath = GetAbsPath(item.value)
+    if bufnr then
+        local basename = vim.fs.basename(absPath)
+        return {
+            id = bufnr,
+            name = basename,
+            path = absPath,
+        }
+    end
     for _, bufferElement in ipairs(bufferline.get_elements().elements) do
         if bufferElement.path == absPath then
             return bufferElement
@@ -93,7 +101,38 @@ function HarpoonBufferline.setup(opts)
     local bufferline = require("bufferline")
     local fit_harpoon = opts.fit_harpoon_storage_on_remove or config.fit_harpoon_storage_on_remove
     local sort_buffers = opts.order_bufferline_as_harpoon or config.order_bufferline_as_harpoon
+    local harpoon_list = harpoon:list()
 
+    -- initial buffers setup
+    vim.schedule(function()
+        for i = 1, harpoon_list:length() do
+            local item = harpoon_list:get(i)
+
+            local bufnr = vim.fn.bufadd(item.value)
+            vim.fn.bufload(bufnr)
+            vim.api.nvim_buf_set_option(bufnr, "buflisted", true)
+
+            local buffer = GetBufferLineBufferFromHarpoonItem(bufferline, item, bufnr)
+            if not buffer then
+                log.notify(
+                    "harpoon Initial",
+                    vim.log.levels.WARN,
+                    "Can't find bufferline buffer for item: %s",
+                    item.value
+                )
+                goto continue
+            end
+            bufferline.groups.add_element(group, buffer)
+            ::continue::
+        end
+
+        if fit_harpoon then
+            FitList(harpoon_list)
+        end
+        if sort_buffers then
+            bufferline.sort_by(SortFunction)
+        end
+    end)
     -- extend harpoon by callbacks on add and remove buffers
     harpoon:extend({
         ADD = function(ctx)
