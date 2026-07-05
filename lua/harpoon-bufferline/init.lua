@@ -90,6 +90,9 @@ local SortFunction = function(buffer_a, buffer_b)
     end
     return buffer_a.path > buffer_b.path
 end
+local SortFunctionById = function(buffer_a, buffer_b)
+    return buffer_a.id > buffer_b.id
+end
 
 -- setup HarpoonBufferline, assume that harpoon2 and bufferline already setuped
 function HarpoonBufferline.setup(opts)
@@ -125,14 +128,15 @@ function HarpoonBufferline.setup(opts)
             bufferline.groups.add_element(group, buffer)
             ::continue::
         end
-
+    end)
+    vim.defer_fn(function()
         if fit_harpoon then
             FitList(harpoon_list)
         end
         if sort_buffers then
             bufferline.sort_by(SortFunction)
         end
-    end)
+    end, 1000)
     -- extend harpoon by callbacks on add and remove buffers
     harpoon:extend({
         ADD = function(ctx)
